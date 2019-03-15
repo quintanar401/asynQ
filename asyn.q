@@ -12,8 +12,8 @@
 .as.split:{x:(0,where (x=";")&0=sums(not{$[x=2;1;x;$["\""=y;0;"\\"=y;2;1];1*"\""=y]}\[0;x])*(neg x in "})]")+x in "({[")_x;@[x;1_til count x;1_]};
 .as.trim:{x[where(reverse&\[reverse v])|&\[v:x in "\n\t\r "]]:" "; trim x};
 .as.strip:{[t;p] 1_-1_.as.trim(count string p)_.as.trim t};
-.as.extv:{$[-11=type x;x;1=count x;();type[x]in 0 11h;raze .z.s each x;()]};
-.as.exta:{$[0=type x;$[(3=count x)&(101=type x 0)|x[0]~(:);first x 1;raze .z.s each x];()]};
+.as.extv:{$[-11=type x;(),x;1=count x;();type[x]in 0 11h;raze .z.s each x;()]};
+.as.exta:{$[0=type x;$[(3=count x)&(101=type x 0)|x[0]~(:);(first x 1),raze .z.s each x;raze .z.s each x];()]};
 .as.extt:{[p]
   if[not(1<c:count p)&type[p]in 0 11h;:`];
   if[`async~p0:p 0; :`async]; / async expr
@@ -63,7 +63,7 @@
     i:2*til count[blk`bl] div 2;
     fn[i+1;1]: count fn; / body jump
     fn[i;1]: bl i+2; / cond jump
-    fn[i;3]: .as.cond each fn[i;3]; / cont fn
+    fn[i;3]: .as.cond@/:fn[i;3]; / cont fn
     :fn;
   ];
   post:"(`async;",$[count a;"enlist[",(";"sv string a),"]";"()"],";)(",((b:blk`txt)1),")";
@@ -72,10 +72,10 @@
 .as.mkAsyncBlk:{[a;pref;fn;blk]
   t:.as.ps txt:blk[`txt]1; ty:`e; v:`;
   if[f:":"~t 0; ty:`r; t:.as.ps txt:1_.as.trim txt]; / : exp
-  if[not[f]&(:)~t 0; if[not -11=type v:t 1; '"bad async assign: ",txt]; ty:`a; t:.as.ps txt:1_ .as.trim (count string v)_ .as.trim txt]; / v: exp
+  if[not[f]&((:)~t 0)|(::)~t 0; if[not -11=type v:t 1; '"bad async assign: ",txt]; ty:`a; t:.as.ps txt:(1+(::)~t 0)_ .as.trim (count string v)_ .as.trim txt]; / v: exp
   if[(not -11=type f:first t)|not type[t]in 0 11h; '"bad async call: ",txt]; / exp -> func ....
   txt:"enlist",(count f:string f)_.as.trim txt;
-  :fn,enlist (value pref,"(`async;",$[count a;"enlist[",(";"sv string a),"]";"()"],";",txt,";`",f,")}";1+count fn;a;$[ty=`e;{[x;y] (`async;-1;x)};ty=`r;{y};{y[x]:z; (`async;-1;y)}v]);
+  :fn,enlist (value pref,"(`async;",$[count a;"enlist[",(";"sv string a),"]";"()"],";",txt,";`",f,")}";1+count fn;a;$[ty=`e;{[x;y] (`async;-1;x)};ty=`r;{y};{$[x in key y;y[x]:z;x set z]; (`async;-1;y)}v]);
  };
 .as.processFn:{[n]
   if[not 100=type x:get n; '"not a function: ",string x];
@@ -87,7 +87,7 @@
   n set value "{[",a,"] .as.run[0;();.as.map[`",string[n],";1];",prx,"]}";
  };
 .as.map:0#.as;
-.as.cond:{[f;args;v] r:f[args;v]; if[not `async~first r; :r]; if[v; v[1]:-2]; args};
+.as.cond:{[f;args;v] r:f[args;v]; if[not `async~first r; :r]; if[v; r[1]:-2]; r};
 / stack: list of (idx;args;map)
 .as.run:{[idx;stack;map;args]
   r:({[idx;stack;map;args]
@@ -106,18 +106,16 @@
       : .as.cont[s;r];  / some value was returned - call the continuation explicitly
     ];
     if[not 3=count r; '"unexpected: ",.Q.s1 r];
-    rr:last[s][args;r 2];
-    if[count[map]<=b:.as.nextblk[map;idx;rr 1]; :(-1;r 2;0;0)];
-    : (b;stack;map;rr 2); / next block
+    : .as.cont[stack,enlist(idx;args;map);r 2];
   }.)/[(idx;stack;map;args)];
   :r 1;
  };
 .as.cont:{[stack;val]
   if[0=count stack; :(-1;val;0;0)];
   s:last stack; stack:-1_stack;
-  if[not `async~first v:(last (m:s 2) i:s 0)[s 1;val]; :.z.s[stack;v]]; / run the continuation
-  if[count[m]<=b:.as.nextblk[m;i;v 1]; :(-1;val;0;0)];
-  : (b;stack;s 2;v 2);
+  if[not `async~first v:(last (m:s 2) i:s 0)[s 1;val]; :.z.s[stack;val]]; / run the continuation
+  if[count[m]<=b:.as.nextblk[m;i;v 1]; :.z.s[stack;val]];
+  : (b;stack;m;v 2);
  };
 .as.nextblk:{[map;i;v] $[v=-1;map[i] 1;i+1]};
 
@@ -140,6 +138,75 @@ test3:{
   v+a
  };
 .as.processFn`test3;
+test4:{
+  a:1;
+  async test2 a+5
+ };
+.as.processFn`test4;
+test5:{
+  a:1;
+  async a:test2 a+5
+ };
+.as.processFn`test5;
+test6:{
+  async a:test2 5
+ };
+.as.processFn`test6;
+test7:{
+  if[1; : async test2 5]
+ };
+.as.processFn`test7;
+test8:{
+  if[1; async test2 v:5; :v]
+ };
+.as.processFn`test8;
+test9:{
+  if[async test2 v:5; async v2:test2 v; :v2]
+ };
+.as.processFn`test9;
+test10:{
+  $[1; async test2 v:5; 10]
+ };
+.as.processFn`test10;
+test11:{
+  $[async v2:test2 v:5; v2+v; 0]
+ };
+.as.processFn`test11;
+test12:{async test2 5; 0};
+.as.processFn`test12;
+test13:{
+  $[async test12 1; 1; 10]
+ };
+.as.processFn`test13;
+test14:{
+  $[async test2 1; 1; 10]
+ };
+.as.processFn`test14;
+test15:{
+  $[async test12 1; 1; async test2 2;2;3 ]
+ };
+.as.processFn`test15;
+test16:{
+  v:1;
+  while[async test2 1; v+:1; if[v>10; :v]]
+ };
+.as.processFn`test16;
+test17:{
+  v:1;
+  do[async test2 1; v+:1]; v
+ };
+.as.processFn`test17;
+test18:{
+  v:1;
+  do[async test2 1; do[async test1 1; v+:1]]; v
+ };
+.as.processFn`test18;
+test19:{
+  tmp::1;
+  async tmp::test2 1;
+  tmp
+ };
+.as.processFn`test19;
 
 test:{
   x+1;
