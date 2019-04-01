@@ -45,7 +45,7 @@
 .as.extt:{[p]
   if[not(1<c:count p)&type[p]in 0 11h;:`];
   if[`async~p0:p 0; :`async]; / async expr
-  if[(2=c)&(":")~p0; if[`async~first p 1; :`async]]; / : async ....
+  if[(2=c)&(":")~p0; if[(not 1=count p 1)&`async~first p 1; :`async]]; / : async ....
   if[(3=c)&(`async~p 1)&(:)~p0; : `async]; / async : expr
   : $[(3<c)&($)~p0;`c;p0~";";`b;any p[0]~/:(`if;`do;`while);p 0;`];
  };
@@ -123,7 +123,7 @@
   prx:"((),",(raze"`",/:string raze l),"`.aloc`.aexc)!(",(a:";"sv string l 0),$[count l 1;";",";"sv (count l 1)#enlist"()";""],";(),",(raze"`",/:string l 0),";.as.exc)";
   blk:.as.mkBlk[l 0;l 1]/[();c];
   blk[0],:x; / save x in case there is .z.s
-  .as.map[x]: (`a;value "{[",a,"]",prx,"}";blk;value "{[",a,"] .as.run[0;();.as.map[`",string[n],";1];",prx,"]}");
+  .as.map[x]: (`a;value "{[",a,"]",prx,"}";blk);
  };
 .as.map:{x!x}(),(::);
 .as.cond:{[f;args;v] r:f[args;v]; if[not `async~first r; :r]; if[v; r[1]:-2]; r};
@@ -133,7 +133,10 @@
   r:({[idx;stack;map;args]
     / 0N!`run,(idx;stack;args);
     if[idx=-1; :(idx;stack;map;args)];
-    if[not `async~first r:.[(s:map idx)0;{(x -1_y),enlist x}[args;args`.aloc];.as.exc];  :.as.cont[stack;r]]; / non async return value
+    if[not `async~first r:.[(s:map idx)0;{(x -1_y),enlist x}[args;args`.aloc];.as.exc];
+      if[`asyncExc~first r; .as.trap[stack,enlist(idx;args;map);r 1]];
+      :.as.cont[stack;r]; / non async return value
+    ];
     if[`async~r; :(-1;r;0;0)]; / abort
     if[2=count r; :.as.cont . r 1]; / continuation was called
     args[s 2]:r 1; / assigns
@@ -142,13 +145,14 @@
       s:$[((idx=-1+count map)|-1=s 1)&.as.exc~r 4;stack;stack,enlist(idx;args;map)]; / tail call elimination - last expr/: expr/no exc handlers
       if[`.z.s~f:r 2; f:last map 0];
       if[`a=(f:.as.getfn f) 0; / async function
-        a:f[1]. r 3; / assign args
+        if[not 99=type a:.[f[1];r 3;::]; '"wrong number of args: ",.Q.s1 last first f 2]; / assign args
         :(0;s;f 2;a); / initiate a new call
       ];
       f:$[`c=f 0; f[1] {(`async;(x;y))}s;f 1]; / custom async func - {[cont;a1;...]}, it may use cont, return `async or a value
       r:.[f;r 3;.as.exc];
       if[`async~r; :(-1;r;0;0)]; / async fn took control over the continuation
       if[`async~first r; :$[2=count r;.as.cont . r 1;r 1]]; / continuation was called
+      if[`asyncExc~first r; .as.trap[stack,enlist(idx;args;map);r 1]];
       : .as.cont[s;r];  / some value was returned - call the continuation explicitly
     ];
     if[not 3=count r; '"unexpected: ",.Q.s1 r];
@@ -167,7 +171,9 @@
  };
 .as.nextblk:{[map;i;v] $[v=-1;map[i] 1;i+1]};
 .as.getfn:{[fn]
-  if[not 100=type fn; '"async requires a function with type 100"];
+  if[-11=type fn; fn:@[get;fn;fn]];
+  if[104=type fn; r:.z.s (v:value fn)0; :$[`a=first r;(`a;r[1]. 1_v;r 2);(r 0;fn)]];
+  if[not 100=type fn; '"async requires a function with type 100: ",.Q.s1 fn];
   if[(::)~f:.as.map fn; .as.processFn fn; f:.as.map fn]; f};
 .as.run:{[fn;args]
   if[-11=type fn; fn:get fn];
@@ -178,6 +184,21 @@
 .as.run1:{[fn;arg] .as.run[fn;enlist arg]};
 .as.resume:{[cont;val] .as.loop . .as.cont . (cont val) 1};
 .as.callcc:{[fn;args] async cont:{[cont;x] (`asyncCont;cont)}[]; if[`asyncCont~first cont; : async .[fn;cont[1],(),args;.as.exc]]; : cont};
+.as.debug:0b;
+.as.err:-1;
+.as.trap:{[stack;val]
+  if[not .as.debug; :val];
+  .as.err "Exception ",.Q.s1 val;
+  {
+    .as.err "  In ",string last first x[2];
+    .as.err "  Args:";
+    k:k where not(k:key x 1)like ".*";
+    .as.err each "    ",/:(string k),'": ",/:.Q.s1 each x[1] k;
+    .as.err "  Failed block:";
+    .as.err "    ",string x[2][x 0;0];
+  } each reverse stack;
+  : val;
+ };
 / .as.each[async fn;args]; args: enlist arg, (arg1;arg2;..)
 .as.each:{
   if[98=type y:(),y;

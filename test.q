@@ -403,3 +403,14 @@ test43S:{
   {test1S[y]+x}/[1;2]
  };
 run1[`test43;1]
+
+test44:{
+  f:{async v:test1 x; v+y}[;10];
+  async r:f 1;
+  :r;
+ };
+test44S:{
+  r:{v:test1S x; v+y}[;10] 1;
+  :r;
+ };
+run1[`test44;1]

@@ -32,8 +32,10 @@ where expression can be one of:
 
 and fn is one of:
 * function name
-* function itself - {...}
+* function itself - {...}, it can't be parted!
 * local variable with the name/function
+
+fn can be parted but only if it is used by name. 
 
 Examples:
 ```
