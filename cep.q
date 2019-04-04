@@ -35,14 +35,14 @@
 
 / clone a msg, send it somewhere and forget about it. It is not an async fn and it doesn't require async keyword.
 / .cep.fork[.log.msg;m];
-.cep.fork:{[fn;m]  nm:.msg.copy m;  .cep.enqueue[fn;nm]; };
+.cep.fork:{[fn;m]  nm:.msg.copy .cep.checkMsg m;  .cep.enqueue[fn;nm]; };
 
 / Execute an async fn with a copy of msg and aggregate the result.
 / async .cep.enrich[`.calc.something;msg;{[m;newm] .msg.setf[m;.msg.getf[m;`body],.msg.getf[newm;`body]]}]
 / if agg is (::) then .cep.agg (substitute body) will be used
 / throws an anync exception with a bad message or text
 .cep.enrich:{[fn;m;agg]
-  nm:.msg.setf[.msg.copy m;`.links`.parent;(-3;.msg.getf[m;`msgName])];  / there are 3 additional refs - nm in stack, nm in exc handler and cont
+  nm:.msg.setf[.msg.copy .cep.checkMsg m;`.links`.parent;(-3;.msg.getf[m;`msgName])];  / there are 3 additional refs - nm in stack, nm in exc handler and cont
   if[(::)~agg; agg:.cep.agg1];
   async r:.[.cep.enqueue0;(fn;nm);{y;(`asyncExc;x)}nm];
   if[r~(); :`async]; / wait for the response
@@ -58,7 +58,7 @@
 / async .cep.split[msg;`.some.fn;msg`body;::]; / split body(list) into elements and process uniformly using .some.fn
 / async .cep.split[msg;`fn1`fn2`fn3;3#enlist msg`body;.agg.fn]; / another case - enrich msg using 3 different funcs
 .cep.split:{[m;fn;split;agg]
-  split:(),split; fn:(),fn;
+  split:(),split; fn:(),fn; .cep.checkMsg m;
   if[not .msg.isMsg first split; split:{nm:.msg.copy x; .msg.set[nm;y]}[m] each split];
   .msg.setf[;`.links`.parent;(-3;.msg.getf[m;`msgName])] each split;
   if[.msg.eq[m;first split]; '"split message is the parent message"];
@@ -128,8 +128,9 @@
 .cep.resumeCont1:{[c] : c[]}; / to be executed from mainQueue
 .cep.agg1:{[m;nm] .msg.set[m;.msg.getf[nm;`body]]}; / defaul agg - subst body
 .cep.agg:{[m;nm] .msg.set[m;raze .msg.getf[;`body]each nm]}; / defaul agg - subst body
-.cep.failCheck:{[m;nm] if[not `ok=.msg.getf[m;`status]; '"parent: wrong state"]; if[not `done=.msg.getf[nm;`status]; :(`asyncExc;nm)]; m}; / check that both parent and child are ok
-.cep.cancel:{{if[`ok=.msg.getf[x;`status]; .msg.setf[x;`status;`cancelled]]}each $[.msg.isMsg x;enlist x;x]}; / cancel children
+.cep.failCheck:{[m;nm] if[`cancelled=s:.msg.getf[m;`status]; :`async]; if[not `ok=s; '"parent: wrong state"]; if[not `done=.msg.getf[nm;`status]; :(`asyncExc;nm)]; m}; / check that both parent and child are ok
+.cep.cancel:{{if[`ok=.msg.getf[x;`status]; .cep.finish0 x; .msg.setf[x;`status;`cancelled]]}each $[.msg.isMsg x;enlist x;x]}; / cancel children
+.cep.checkMsg:{if[not .msg.isMsg x; '"not a message: ",.Q.s1 x]; if[not `ok~s:.msg.getf[x;`status]; '"wrong msg status: ",string s]; x};
 
 .cep.init:{
   .cep.cron.init[];
