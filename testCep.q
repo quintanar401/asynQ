@@ -203,8 +203,8 @@
 
 .test.fn26:{
   -1 "fn26: split msg into 3 msgs using 1 fn27";
-  async .cep.split[m:.msg.makeMsg `zz`body!(1;"parent: fn17");`.test.fn27;til 3;::];
-  -1 "fn26: content is: ",.Q.s1 .msg.getf[m;`body];
+  async .cep.split[m:.msg.makeMsg `zz`body!(1;"parent: fn17");`.test.fn27;til 3;::]; / comment
+  -1 "fn26: content is: ",.Q.s1 .msg.getf[m;`body]; / comment
   -1 "fn26: split msg inmto 3 msgs using 1 fn28";
   async .[.cep.split;(m;`.test.fn28;til 3;::);{-1 "fn26: exception is: ",$[.msg.isMsg x;.msg.str x;x]}];
   -1 "fn26: after exc: should appear only once";

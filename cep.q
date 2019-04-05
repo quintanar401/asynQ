@@ -46,7 +46,7 @@
   if[(::)~agg; agg:.cep.agg1];
   async r:.[.cep.enqueue0;(fn;nm);{y;(`asyncExc;x)}nm];
   if[r~(); :`async]; / wait for the response
-  async .cep.failCheck[m;nm]; / exception if either m or nm are in a wrong state
+  async .cep.failCheck[m;nm;enlist nm]; / exception if either m or nm are in a wrong state
   agg[m;nm];
   : m;
  };
@@ -70,7 +70,7 @@
       .msg.setf[m;`.resultsCnt;c:1+.msg.getf[m;`.resultsCnt]];
       if[c>count split; :`async]; / there was an exception and this is a late response
       / if there is a problem, cancel all remaining msgs, mark msg to stop all further processing, throw an exc
-      async .[.cep.failCheck;(m;split i);{.cep.cancel y; .msg.setf[x;`.resultsCnt;count y]; (`asyncExc;z)}[m;split]];
+      async .cep.failCheck[m;split i;split];
       if[c=count split; / we are done
         agg[m;split];
         :m;
@@ -128,7 +128,13 @@
 .cep.resumeCont1:{[c] : c[]}; / to be executed from mainQueue
 .cep.agg1:{[m;nm] .msg.set[m;.msg.getf[nm;`body]]}; / defaul agg - subst body
 .cep.agg:{[m;nm] .msg.set[m;raze .msg.getf[;`body]each nm]}; / defaul agg - subst body
-.cep.failCheck:{[m;nm] if[`cancelled=s:.msg.getf[m;`status]; :`async]; if[not `ok=s; '"parent: wrong state"]; if[not `done=.msg.getf[nm;`status]; :(`asyncExc;nm)]; m}; / check that both parent and child are ok
+.cep.failCheck:{[m;nm;ms] / check that both parent and child are ok
+  if[not (`done=.msg.getf[nm;`status])&`ok=s:.msg.getf[m;`status];
+    .cep.cancel ms; .msg.setf[m;`.resultsCnt;count ms];
+    $[s=`cancelled;`:async;s=`ok;'"parent: wrong state";:(`asyncExc;nm)];
+  ];
+  m
+ };
 .cep.cancel:{{if[`ok=.msg.getf[x;`status]; .cep.finish0 x; .msg.setf[x;`status;`cancelled]]}each $[.msg.isMsg x;enlist x;x]}; / cancel children
 .cep.checkMsg:{if[not .msg.isMsg x; '"not a message: ",.Q.s1 x]; if[not `ok~s:.msg.getf[x;`status]; '"wrong msg status: ",string s]; x};
 

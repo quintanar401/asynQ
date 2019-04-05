@@ -36,9 +36,10 @@
 / continuation should be called:
 /   from an async function AND immediately returned: async {...; : savedContinuation val; }, it will replace the current calculation in the exiting async loop
 /   or using .as.resume[cont;val], it will start a new async loop !!!
-.as.ps:{x:x where not 2=0 (0 0 1 1 0 3 0 0;0 0 1 1 2 3 0 0;0 0 2 2 2 2 2 2;3 3 3 3 3 0 4 3;3 3 3 3 3 3 3 3)\"\r\n\t /\"\\"?x; x[where x in"\r\n"]:" "; parse x}; / parse str, remove comments
+.as.noc:{x[where 2=0 (0 0 1 1 0 3 0 0;0 0 1 1 2 3 0 0;0 0 2 2 2 2 2 2;3 3 3 3 3 0 4 3;3 3 3 3 3 3 3 3)\"\r\n\t /\"\\"?x]:" ";x}; / remove comments
+.as.ps:{x:.as.noc x; x[where x in"\r\n"]:" "; parse x}; / parse str, remove comments
 .as.split:{x:(0,where (x=";")&0=sums(not{$[x=2;1;x;$["\""=y;0;"\\"=y;2;1];1*"\""=y]}\[0;x])*(neg x in "})]")+x in "({[")_x;@[x;1_til count x;1_]};
-.as.trim:{x[where(reverse&\[reverse v])|&\[v:x in "\n\t\r "]]:" "; trim x};
+.as.trim:{x[where(reverse&\[reverse v])|&\[v:(.as.noc x) in "\n\t\r "]]:" "; trim x};
 .as.strip:{[t;p] 1_-1_.as.trim(count string p)_.as.trim t};
 .as.extv:{$[-11=type x;(),x;1=count x;();type[x]in 0 11h;raze .z.s each x;()]};
 .as.exta:{$[0=type x;$[(3=count x)&(101=type x 0)|x[0]~(:);$[20>value x 0;first x 1;()],raze .z.s each x;raze .z.s each x];()]};
