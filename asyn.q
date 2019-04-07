@@ -185,6 +185,7 @@
 .as.run1:{[fn;arg] .as.run[fn;enlist arg]};
 .as.resume:{[cont;val] .as.loop . .as.cont . (cont val) 1};
 .as.callcc:{[fn;args] async cont:{[cont;x] (`asyncCont;cont)}[]; if[`asyncCont~first cont; : async .[fn;cont[1],(),args;.as.exc]]; : cont};
+.as.show:{if[-11=type x; x:get x]; if[not 100=type x;'"type"]; $[`a=first f:.as.getfn x;f[2;;0];x]};
 .as.debug:0b;
 .as.err:-1;
 .as.trap:{[stack;val]

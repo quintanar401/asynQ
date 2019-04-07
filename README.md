@@ -3,8 +3,27 @@
 The library allows you to call functions that may not return immediately. It can be used to create CEP processes, async Gateways and etc. In addition you gain access to function's continuations - like call/cc in scheme - that is you can resume some function many times.
 
 There are severe limitations of course: all async calls must be marked with async keyword in all call chain, the initial function or a continuation must be started via the library functions, you can't use async functions in adverbs or QSQL.
+```
+.rdb.processTrade:{[msg]
+  someProc msg;
+  async .cep.delay 0D00:05; / wait a bit
+  async .cep.split[msg;.rdb.processX;1 2 3;::]; / split msg, process, and aggregate
+ };
+.rdb.processX:{[msg]
+  process msg;
+  async i:.cep.requestInfoInHDB[msg];
+  : process[msg;i];
+ };
+/ somewhere there is a call
+.cep.enqueue[.rdb.processTrade;msg]; / or .as.run1[.rdb.processTrade;msg] - to start the fn right away
+```
 
-The library works by splitting all async functions (functions that use async keyword) into blocks - sync blocks and async calls and then executes them in a loop taking care of local variables and maintaining async call stack. The overhead is negligible for real functions.
+The library works by splitting all async functions (functions that use async keyword) into blocks - sync blocks and async calls and then executes them in a loop taking care of local variables and maintaining async call stack. The overhead is negligible for real functions. For example `.rdb.processTrade` would be split into (approximately):
+```
+{someProc msg},{(asyncFn indicator;.cep.delay;0D00:05)},{(asyncFn indicator;.cep.split;(msg;.rdb.processX;1 2 3;::))},{::}
+```
+
+For example how asyn.q can be used to build a cep see cep.q and CEP.md.
 
 ## Usage
 
@@ -24,7 +43,7 @@ Async expression looks like:
 * : async expression - the result is returned.
 * async : expression - the same as : async expression.
 
-where expression can be one of:
+where expression can be one of (args can be any expressions including assigns):
 * fn arg
 * fn[arg1;arg2;..]
 * @[fn;arg;handler]
@@ -35,7 +54,7 @@ and fn is one of:
 * function itself - {...}, it can't be parted!
 * local variable with the name/function
 
-fn can be parted but only if it is used by name. 
+fn can be parted but only if it is used by name (it is hard to extract it otherwise).
 
 Examples:
 ```
@@ -58,8 +77,8 @@ async .cron.delay 0D00:03; / returns after 3 min
 Allowed return values:
 * value - any Q value.
 * exception - Q exception as well.
-* \`async - terminate the current async call (it will be resumed later via a continuation).
-* (\`asyncExc;value) - raise an exception, it can be caught by an async catch block.
+* \`async - terminate the current async call (it can be resumed later via a continuation).
+* (\`asyncExc;value) - raise an exception, it can be caught by an async catch block. Set .as.debug to 1b to print the current async stack with all functions and local vars on each exception.
 
 Continuations:
 * if you call them from an async/CPS function then you MUST immediately return their value: `: cont val`.
@@ -74,10 +93,33 @@ async .[fn;args;handler]
 ```
 handler shouldn't be async.
 
-To raise an exception use ' or return (\`asyncExc;value) from an async/CPS function:
+To raise an exception use ' or return (\`asyncExc;value) from a function (in async function do this explicitly with :):
 ```
 async { if[bad; :(`asyncExc;value)]; ..}[];
 ```
+
+## Adverbs and QSQL
+
+Async funcs do not work with adverbs/QSQL. However for adverbs there are async analogs: .as.each, .as.scan and etc.
+```
+async .as.each[{async .cep.delay 0D00:00:10;x+1};enlist 1 2 3];
+```
+
+## API
+
+* .as.run[fn;arglst] - run fn using arg list. Starts a new async loop.
+* .as.run1[fn;arg] - run unary/nilladic fn using arg. Starts a new async loop.
+* .as.resume[cont;arg] - resume a continuation. Starts a new async loop.
+* .as.each[fn;arglist] - async analog of '
+* .as.over[fn;arglist] - async analog of /
+* .as.scan[fn;arglist] - async analog of \\
+* .as.prior[fn;arglist] - async analog of ':
+* .as.eachr[fn;arglist] - async analog of /:
+* .as.eachl[fn;arglist] - async analog of \\:
+* .as.show fn - return blocks in which an async fn is splitted.
+* .as.debug - set to 1b to print all exceptions in async funcs - stack and local vars.
+* .as.err - function used by .as.trap when .as.debug is 1b.
+* .as.trap - function that is called for each async exception.
 
 ## Tail call elimination
 

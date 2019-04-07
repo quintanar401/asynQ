@@ -28,7 +28,7 @@
 .msg.copy:{.msg.makeMsg .msg.get x};
 .msg.str:{m:.msg.get x; ", "sv(string key m),'": ",/:.Q.s1 each value m};
 .msg.isMsg:{if[(1=count x)&11=type x; x:@[get;x 0;::]]; if[not 99=type x; :0b]; if[not 11=type key x; :0b]; all `msgName`pointer`status in key x};
-.msg.eq:{.msg.getf[x;`msgName]=.msg.getf[y;`msgName]};
+.msg.eq:{.msg.name[x]=.msg.name[y]};
 .msgs:1#.msg;
 
 .cep.mainQueue:();
@@ -42,7 +42,7 @@
 / if agg is (::) then .cep.agg (substitute body) will be used
 / throws an anync exception with a bad message or text
 .cep.enrich:{[fn;m;agg]
-  nm:.msg.setf[.msg.copy .cep.checkMsg m;`.links`.parent;(-3;.msg.getf[m;`msgName])];  / there are 3 additional refs - nm in stack, nm in exc handler and cont
+  nm:.msg.setf[.msg.copy .cep.checkMsg m;`.links`.parent;(-2;.msg.name m)];  / there are 3 additional refs - nm in stack, nm in exc handler and cont
   if[(::)~agg; agg:.cep.agg1];
   async r:.[.cep.enqueue0;(fn;nm);{y;(`asyncExc;x)}nm];
   if[r~(); :`async]; / wait for the response
@@ -60,17 +60,17 @@
 .cep.split:{[m;fn;split;agg]
   split:(),split; fn:(),fn; .cep.checkMsg m;
   if[not .msg.isMsg first split; split:{nm:.msg.copy x; .msg.set[nm;y]}[m] each split];
-  .msg.setf[;`.links`.parent;(-3;.msg.getf[m;`msgName])] each split;
+  .msg.setf[;`.links`.parent;(-1;.msg.name m)] each split;
   if[.msg.eq[m;first split]; '"split message is the parent message"];
   if[(::)~agg; agg:.cep.agg];
-  .msg.setf[m;`.resultsCnt;0]; i:-1; fn:count[split]#fn;
+  cm:.msg.makeMsg `.resultsCnt`!(0;::); i:-1; fn:count[split]#fn;
   do[count split;
     async r:.[.cep.enqueue0;(fn i;split i+:1);{(::)}]; / do not allow exceptions
     if[not ()~r;
-      .msg.setf[m;`.resultsCnt;c:1+.msg.getf[m;`.resultsCnt]];
-      if[c>count split; :`async]; / there was an exception and this is a late response
+      .msg.setf[cm;`.resultsCnt;c:1+.msg.getf[cm;`.resultsCnt]];
+      if[not `ok=.msg.getf[cm;`status]; :`async]; / there was an exception and this is a late response
       / if there is a problem, cancel all remaining msgs, mark msg to stop all further processing, throw an exc
-      async .cep.failCheck[m;split i;split];
+      async .cep.failCheck[m;split i;split,enlist cm];
       if[c=count split; / we are done
         agg[m;split];
         :m;
@@ -88,10 +88,9 @@
   :`async;
  };
 
-/ delay an async fn for some time: fn, var with time or fn, span, stamp
+/ delay an async fn for some time: fn,  span, stamp
 / async .cep.delay 0D00:01
 .cep.delay:{[cont;tm]
-  if[-11=type tm; tm:get tm];
   if[100=type tm; tm:tm[]];
   if[type[tm]in -16 -19h; tm:.z.P+tm];
   if[not -12=type tm; '"wrong time: ",.Q.s1 tm];
@@ -130,13 +129,14 @@
 .cep.agg:{[m;nm] .msg.set[m;raze .msg.getf[;`body]each nm]}; / defaul agg - subst body
 .cep.failCheck:{[m;nm;ms] / check that both parent and child are ok
   if[not (`done=.msg.getf[nm;`status])&`ok=s:.msg.getf[m;`status];
-    .cep.cancel ms; .msg.setf[m;`.resultsCnt;count ms];
-    $[s=`cancelled;`:async;s=`ok;'"parent: wrong state";:(`asyncExc;nm)];
+    .cep.cancel ms;
+    $[s=`cancelled;:`async;s=`ok;:(`asyncExc;nm);'"parent: wrong state"];
   ];
   m
  };
 .cep.cancel:{{if[`ok=.msg.getf[x;`status]; .cep.finish0 x; .msg.setf[x;`status;`cancelled]]}each $[.msg.isMsg x;enlist x;x]}; / cancel children
 .cep.checkMsg:{if[not .msg.isMsg x; '"not a message: ",.Q.s1 x]; if[not `ok~s:.msg.getf[x;`status]; '"wrong msg status: ",string s]; x};
+.cep.raise:{if[`ok=.msg.getf[x;`status]; c:.cep.finishx x; .msg.setf[x;`status`exc;(`exc;y)]; if[not (::)~c; .cep.enqueue[{: x[0] x 1};(c;(`asyncExc;y))]]]};
 
 .cep.init:{
   .cep.cron.init[];
@@ -169,6 +169,7 @@
       .msg.setf[x;`status`exc;(`exc;y)];
       : .cep.enqueue[{: x[0] x 1};(c;(`asyncExc;y))];
     ];
+    if[`cancelled=.msg.getf[x;`status];:()];
   ];
   e:$[f:.msg.isMsg y;.msg.str y;y];
   .cep.log "Unexpected exception: ",e;
