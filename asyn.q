@@ -260,3 +260,11 @@
  }; / each right/left
 .as.eachl:{async .as.elr[x;(),y;0b]};
 .as.eachr:{async .as.elr[x;(),y;1b]};
+
+/ iterators
+/ async .as.iRet value;
+.as.iRet:{[cont;val] (`async;(();((`asyncCont;cont);val)))};
+/ .as.iCall[fn;arg];  where fn is an async fn or the result of .as.iRet
+.as.iCall1:.as.run1;
+.as.iCall:.as.run;
+.as.iNext:{[f;a] if[`asyncCont~first first f; v:.as.resume[(last first f);a]; if[not `asyncCont~first first v; v:(();v)]; :v]; '"empty"};

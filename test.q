@@ -414,3 +414,11 @@ test44S:{
   :r;
  };
 run1[`test44;1]
+
+test45:{
+  f:{i:0; async .as.iRet 0; while[1; async .as.iRet i; i+:1]};
+  f:.as.iCall[f;1]; / init
+  while[1; f:.as.iNext[f;1]; if[5=last f; :last f]]; 
+ };
+test45S:{5};
+run1[`test45;1];

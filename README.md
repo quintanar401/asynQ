@@ -121,6 +121,18 @@ async .as.each[{async .cep.delay 0D00:00:10;x+1};enlist 1 2 3];
 * .as.err - function used by .as.trap when .as.debug is 1b.
 * .as.trap - function that is called for each async exception.
 
+Iterators:
+* .as.iCall1[fn;arg] and .as.iCall[fn;args] - call an async iterator function fn with 1 or several args. Returns a list (iter;val). The list should be used with iNext to get the next val.
+* .as.iNext[iter;val] - resume an iterator, returns a list of (iter;val) that should be passed to the next iNext call.
+* async .as.iRet val - return a value to a caller.
+
+Example:
+```
+f1:{f:f2; while[1; f:.as.iCall1[f;1]; if[10=last f; :10]]}; / function that use an iter is not required to be async
+f2:{i:0; while[1; async .as.iRet i; i+:1]}; / async iterator
+
+```
+
 ## Tail call elimination
 
 As a bonus all async tail calls are eliminated. It means you can replace cycles/adverbs with recursive calls like:

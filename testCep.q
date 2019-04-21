@@ -3,6 +3,17 @@
 
 .cep.init[];
 
+.test.fn0:{
+  it:.cep.iGet .test.myLoop;
+  v:.cep.iCall[it;10]; / number of iterations
+  while[1; v:.[.cep.iNext;(it;v-1);::]; if[10=type v; -1 "iter: ",v; :()]; 1 string[v]," "];
+ };
+.test.myLoop:{[n]
+  async .cep.iRet n; / init phase
+  while[n; async n:.cep.iRet n];
+ };
+.cep.enqueue[`.test.fn0;100];
+
 .cep.enqueue[`.test.fn1;100];
 
 .test.fn1:{
@@ -15,11 +26,12 @@
   -1  "fn2 end ",string .z.T;
  };
 
+.test.tm:0D00:00:25;
+
 .cep.enqueue[`.test.fn2;0D00:00:10];
 .cep.enqueue[`.test.fn2;.z.P+0D00:00:15];
 .cep.enqueue[`.test.fn2;{0D00:00:20}];
-.cep.enqueue[`.test.fn2;`.test.tm];
-.test.tm:0D00:00:25;
+.cep.enqueue[`.test.fn2;.test.tm];
 
 .test.fn3:{
   -1 "fn3: allow fn4 to execute";

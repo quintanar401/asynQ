@@ -23,6 +23,7 @@
 .msg.getf:{(get x 0)y};
 .msg.getfOpt:{$[y in key o:get x 0;o y;z]};
 .msg.name:{x 0};
+.msg.names:{x[;0]};
 .msg.setf:{[m;f;v] @[m 0;f;:;v]; m};
 .msg.set:.msg.setf[;`body];
 .msg.copy:{.msg.makeMsg .msg.get x};
@@ -117,6 +118,12 @@
 .cep.finish0:{[m] if[not (::)~c:.cep.finishx m; .cep.enqueue[{: x[]};c]]};
 / reset cont and links fields
 .cep.finishx:{[m] if[not `ok=.msg.getf[m;`status]; :(::)]; .msg.setf[m;`status;`done]; if[not (::)~c:.msg.getf[m;`cont]; .msg.setf[m;`cont`.links;((::);0)]; :c]};
+
+.cep.iGet:{[fn] .msg.makeMsg `fn`cont!(fn;())};
+.cep.iCall:{[i;args] v:.as.run[.msg.getf[i;`fn];args]; if[`asyncCont~first v 0; .msg.setf[i;`cont;last v 0]; :v 1]; v};
+.cep.iCall1:{[i;arg] .cep.iCall[i;enlist arg]};
+.cep.iRet:.as.iRet;
+.cep.iNext:{[i;v] if[()~c:.msg.getf[i;`cont]; '"empty"]; v:.as.resume[c;v]; if[`asyncCont~first v 0; .msg.setf[i;`cont;last v 0]; :v 1]; .msg.setf[i;`cont;()]; v};
 
 / two versions. 1) enqueues the msg and returns to allow to check the result, 2) just redirects the msg and terminates
 .cep.enqueue0:{[cont;fn;m] .cep.mainQueue,:enlist (fn;.msg.setf[m;`cont;cont]); ()};

@@ -148,3 +148,24 @@ Params:
 async .cep.split[msg;.some.fn;.msg.getf[msg`body];::]; / split body(list) into elements and process uniformly using .some.fn
 async .cep.split[msg;`fn1`fn2`fn3;3#enlist .msg.getf[msg;`body];{.msg.set[x] raze .msg.getf[;`body] each y}]; / another case - enrich msg using 3 different funcs
 ```
+
+## Iterators
+
+* .cep.iGet[fn] - initialize an iterator with an async function.
+* .cep.iCall[iter;args] or .cep.iCall1[iter;arg] - call an iterator for the first time.
+* .cep.iNext[iter;val] - call an iterator again.
+* async .cep.iRet[val] - return a value from an iterator, calcs can be resumed from this place.
+
+If you return a value without iRet or throw an exception then the iterator will be done, any subsequent call will produce empty exception.
+
+Example:
+```
+it:.cep.iGet .cep.myLoop;
+v:.cep.iCall[it;100]; / number of iterations
+while[1; v:.[.cep.iNext;(it;v-1);::]; if[10=type v; :0]];
+...
+.cep.myLoop:{[n]
+  async .cep.iRet n; / init phase
+  while[n; async n:.cep.IRet n];
+ };
+```
