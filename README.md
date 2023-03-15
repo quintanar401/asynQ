@@ -3,7 +3,7 @@
 The library allows you to call functions that may not return immediately. It can be used to create CEP processes, async Gateways and etc. In addition you gain access to function's continuations - like call/cc in scheme - that is you can resume some function many times.
 
 There are severe limitations of course: all async calls must be marked with async keyword in all call chain, the initial function or a continuation must be started via the library functions, you can't use async functions in adverbs or QSQL.
-```
+```q
 .rdb.processTrade:{[msg]
   someProc msg;
   async .cep.delay 0D00:05; / wait a bit
@@ -19,7 +19,7 @@ There are severe limitations of course: all async calls must be marked with asyn
 ```
 
 The library works by splitting all async functions (functions that use async keyword) into blocks - sync blocks and async calls and then executes them in a loop taking care of local variables and maintaining async call stack. The overhead is negligible for real functions. For example `.rdb.processTrade` would be split into (approximately):
-```
+```q
 {someProc msg},{(asyncFn indicator;.cep.delay;0D00:05)},{(asyncFn indicator;.cep.split;(msg;.rdb.processX;1 2 3;::))},{::}
 ```
 
@@ -28,7 +28,7 @@ For example how asyn.q can be used to build a cep see cep.q and CEP.md.
 ## Usage
 
 Async call must occupy one whole statement and this statement must be a statement in the parent expression and so up to top. That is you can use async in if, while, do, $(case), between ";" in a statement list but can't use it in the arguments of a function or as an element of a list/any expression:
-```
+```q
 if[async ..; ] / ok
 $[async ..; async ..; async ..] / all ok
 1+$[async ..;..;...] / not ok - $[..] is not a statement
@@ -57,7 +57,7 @@ and fn is one of:
 fn can be parted but only if it is used by name (it is hard to extract it otherwise).
 
 Examples:
-```
+```q
 async .cron.delay 0D00:03
 : async calc[x+1;10]
 async v: @[.cep.split;msg;{...}]
@@ -68,7 +68,7 @@ You can use any function (type 100) with async keyword but only two types are no
 * CPS functions (continuation passing style) - these are ordinary functions that have cont as the first argument: {[cont;..] }, where cont is the current continuation.
 
 CPS functions are endpoints that store cont until the return value is ready. For example:
-```
+```q
 .cron.delay:{[cont;tm] .cron.addJob[... set fn to {.as.resume[x;::]}, arg to cont, time to .z.P+tm...]; :`async}
 / and in an async func
 async .cron.delay 0D00:03; / returns after 3 min
@@ -87,21 +87,21 @@ Continuations:
 ## Exception blocks
 
 You can use the usual Q try block with async:
-```
+```q
 async @[fn;arg;handler] / and all other variants with assign and return
 async .[fn;args;handler]
 ```
 handler shouldn't be async.
 
 To raise an exception use ' or return (\`asyncExc;value) from a function (in async function do this explicitly with :):
-```
+```q
 async { if[bad; :(`asyncExc;value)]; ..}[];
 ```
 
 ## Adverbs and QSQL
 
 Async funcs do not work with adverbs/QSQL. However for adverbs there are async analogs: .as.each, .as.scan and etc.
-```
+```q
 async .as.each[{async .cep.delay 0D00:00:10;x+1};enlist 1 2 3];
 ```
 
@@ -127,7 +127,7 @@ Iterators:
 * async .as.iRet val - return a value to a caller.
 
 Example:
-```
+```q
 f1:{f:f2; while[1; f:.as.iCall1[f;1]; if[10=last f; :10]]}; / function that use an iter is not required to be async
 f2:{i:0; while[1; async .as.iRet i; i+:1]}; / async iterator
 
@@ -136,7 +136,7 @@ f2:{i:0; while[1; async .as.iRet i; i+:1]}; / async iterator
 ## Tail call elimination
 
 As a bonus all async tail calls are eliminated. It means you can replace cycles/adverbs with recursive calls like:
-```
+```q
 cepLoop:{[a] / infinite recursive loop
   if[count msgs; process 1 msg; : async cepLoop[]];
   async .cron.wait 100;
@@ -148,20 +148,20 @@ The call will be eliminated only if a) it is async b) it is the last expression 
 ## .z.s calls
 
 You can use .z.s in async functions but only with async keyword (because .z.s is an async function):
-```
+```q
 {if[x>10; :x]; async .z.s x+1}
 ```
 
 ## Continuations
 
 These are 100% genuine continuations. For example here is the (in)famous yinyang function that is notoriously hard to understand:
-```
+```q
 {async yin: {[cont;x] cont}[]; 1 "@"; async yang: {[cont;x] cont}[]; 1 "*"; : yin yang}
 ```
 If you call a continuation from an async fn as above you MUST return its value.
 
 To simplify the continuation capture in async functions there is callcc function (use CPS functions for non-async fns):
-```
+```q
 async .as.callcc[asyncFn;args];
 ...
 asynFn:{[cont;args...] ...; async ...; : cont val};
